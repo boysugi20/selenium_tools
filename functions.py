@@ -1,15 +1,12 @@
 import os
 import random
 import time
-import urllib.request
 
 import requests
-import stem.connection
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 import logging
 
-from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
@@ -29,7 +26,6 @@ import psutil
 
 logger = logging.getLogger("seleniumwire")
 logger.setLevel(logging.ERROR)
-
 
 class Proxy():
     def __init__(self, proxy_list):
@@ -173,23 +169,6 @@ def get_tor_session(username=None, password=None):
     return session
 
 
-# Generate Service object
-def get_chrome_driver_service(path):
-    """
-    Returns Service object to be used when creating chrome driver instances.
-
-                    Parameters:
-                                    path (str): Path to chromedriver
-
-                    Returns:
-                                    Service (obj): object for creating driver instances.
-    """
-
-    service = Service(path)
-
-    return service
-
-
 # Generate fake user agent
 def get_fake_ua():
     """
@@ -203,20 +182,111 @@ def get_fake_ua():
     return user_agent
 
 
+# Check driver IP
+def check_driver_ip(driver, ipCheckLink="https://ident.me"):
+    """
+    Returns ip address used by specified driver instance
+
+                    Parameters:
+                                    ipCheckLink (str): URL to check ip Address
+                                    driver (obj): Chrome driver
+
+                    Returns:
+                                    ip (str): ip address
+    """
+
+    driver.get(ipCheckLink)
+    check_ip_html = driver.page_source
+
+    soup = BeautifulSoup(check_ip_html, "lxml")
+
+    ip = str(soup.text)
+
+    ip = ip.strip()
+
+    return ip
+
+
+# Click button
+def click_button(driver, wait_time, xpath):
+
+    button = WebDriverWait(driver, wait_time).until(
+        ec.element_to_be_clickable((By.XPATH, xpath))
+    )
+    button.click()
+
+    return
+
+
+# Click item from dropdown
+def click_dropdown_item(driver, xpath, index):
+    
+    items = driver.find_elements_by_xpath(xpath)
+    action = ActionChains(driver)
+    action.move_to_element(items[index]).perform()
+
+    return
+
+
+# Input text
+def input_text(driver, wait_time, xpath, text, clear=False, enter=False):
+
+    text_input = WebDriverWait(driver, wait_time).until(
+        ec.visibility_of_element_located((By.XPATH, xpath))
+    )
+
+    if clear:
+        text_input.send_keys("\ue009" + "\ue003")
+
+    text_input.send_keys(text)
+
+    if enter:
+        text_input.send_keys(Keys.ENTER)
+
+    return
+
+
+# Check if element exist
+def check_element(driver, xpath):
+    try:
+        driver.find_element(by=By.XPATH, value=xpath)
+    except NoSuchElementException:
+        return False
+    return True
+
+
+# Generate Service object
+def get_chrome_driver_service(path):
+    """
+    Returns Service object to be used when creating chrome driver instances.
+
+        Parameters:
+            path (str): Path to chromedriver
+
+        Returns:
+            Service (obj): object for creating driver instances.
+    """
+
+    service = Service(path)
+
+    return service
+
+
 # Create a driver instance
-def get_driver(chromeDriverPath, ipCheckLink=None, user_agent=None, proxy=None, headless=True):
+def get_driver(path, check_ip=True, user_agent=None, proxy=None, headless=True):
     """
     Returns chrome driver
 
-                    Parameters:
-                                chromeDriverPath (str): ChromeDriver path
-                                user_agent (obj): user agent
-                                proxy (str): proxy to use (url or 'tor')
-                                headless (bool): headless or not
+    Parameters:
+        path (str): ChromeDriver path
+        check_ip (bool): check driver IP address or not
+        user_agent (str): determine driver's user agent
+        proxy (str): determine driver's proxy (http://{proxy}) or pass "tor" to use TOR
+        headless (bool): run in headless mode or not
 
-                    Returns:
-                                    driver (obj): chrome driver instances
-                                    driver_info (dict): user_agent, ip
+    Returns:
+        driver (obj): chrome driver instances
+        driver_info (dict): user_agent, ip
     """
 
     options = webdriver.ChromeOptions()
@@ -258,96 +328,22 @@ def get_driver(chromeDriverPath, ipCheckLink=None, user_agent=None, proxy=None, 
     # Try passing service, else pass path
     try:
         driver = webdriver.Chrome(
-            service=get_chrome_driver_service(chromeDriverPath),
+            service=get_chrome_driver_service(path),
             options=options,
             seleniumwire_options=sw_options,
         )
     except:
         try:
             driver = webdriver.Chrome(
-                chromeDriverPath, options=options, seleniumwire_options=sw_options
+                path, options=options, seleniumwire_options=sw_options
             )
         except:
             raise Exception("[WARNING] Failed to create chrome session (check version)")
 
-    if ipCheckLink is not None:
-        ip = check_ip(driver=driver, ipCheckLink=ipCheckLink)
+    if check_ip:
+        ip = check_driver_ip(driver=driver)
+        driver_info = {"user_agent": user_agent, "ip": ip}
     else:
-        ip = check_ip(driver=driver)
-
-    driver_info = {"user_agent": user_agent, "ip": ip}
+        driver_info = {"user_agent": user_agent, "ip": ''}
 
     return driver, driver_info
-
-
-# Check driver IP
-def check_ip(driver, ipCheckLink="https://ident.me"):
-    """
-    Returns ip address used by specified driver instance
-
-                    Parameters:
-                                    ipCheckLink (str): URL to check ip Address
-                                    driver (obj): Chrome driver
-
-                    Returns:
-                                    ip (str): ip address
-    """
-
-    driver.get(ipCheckLink)
-    check_ip_html = driver.page_source
-
-    soup = BeautifulSoup(check_ip_html, "lxml")
-
-    ip = str(soup.text)
-
-    ip = ip.strip()
-
-    return ip
-
-
-# Click button
-def click_button(driver, wait_time, xpath):
-
-    button = WebDriverWait(driver, wait_time).until(
-        ec.element_to_be_clickable((By.XPATH, xpath))
-    )
-    button.click()
-
-    return
-
-
-# Click item from dropdown
-def click_dropdown_item(driver, wait_time, xpath, index):
-
-    items = driver.find_elements_by_xpath(xpath)
-    action = ActionChains(driver)
-    action.move_to_element(items[index]).perform()
-
-    return
-
-
-# Input text
-def input_text(driver, wait_time, xpath, text, clear=False, enter=False):
-
-    text_input = WebDriverWait(driver, wait_time).until(
-        ec.visibility_of_element_located((By.XPATH, xpath))
-    )
-
-    if clear:
-        text_input.send_keys("\ue009" + "\ue003")
-
-    text_input.send_keys(text)
-
-    if enter:
-        text_input.send_keys(Keys.ENTER)
-
-    return
-
-
-# Check if element exist
-def check_element(driver, xpath):
-    try:
-        driver.find_element(by=By.XPATH, value=xpath)
-    except NoSuchElementException:
-        return False
-    return True

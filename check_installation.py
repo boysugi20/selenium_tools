@@ -1,7 +1,5 @@
-import time
-import random
 import argparse
-import tools.functions as tools
+import functions as tools
 
 message = """
 ----------------------------------------------------------------------------------------------------------
@@ -27,14 +25,12 @@ Note:
 """
 
 ap = argparse.ArgumentParser()
-ap.add_argument("-ip","--ip_link", type=str, default = "https://ident.me") 
 ap.add_argument("-hl","--headless", type=bool, default = True) 
 ap.add_argument("-cd","--chromedriver", type=str, default = '/usr/lib/chromium-browser/chromedriver') 
 args = ap.parse_args()
 
 print(message)
 
-ipCheckLink = args.ip_link
 chromeDriverPath = args.chromedriver
 
 # List of proxy (format ip:port:username:pass) [line seperated]
@@ -64,7 +60,7 @@ try:
         tools.renew_connection()
 
         user_agent = tools.get_fake_ua()
-        driver, driver_info = tools.get_driver(chromeDriverPath, ipCheckLink, user_agent, headless = args.headless)
+        driver, driver_info = tools.get_driver(chromeDriverPath, True, user_agent, headless = args.headless)
 
         print(driver_info)
 
@@ -83,7 +79,7 @@ try:
         proxy_obj.set_proxy_busy(proxy_url)
 
         user_agent = tools.get_fake_ua()
-        driver, driver_info = tools.get_driver(chromeDriverPath, ipCheckLink, user_agent, proxy=proxy_url, headless = args.headless)
+        driver, driver_info = tools.get_driver(chromeDriverPath, True, user_agent, proxy=proxy_url, headless = args.headless)
 
         print(driver_info)
 
